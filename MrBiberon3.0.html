@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MR.BIBERÓN 3.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos personalizados y tipografía */
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Orbitron', sans-serif;
+            background: #0d0124; 
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* Contenedor del juego - la "franja" */
+        #game-container {
+            position: relative;
+            width: 95%; /* Más ancho en móviles */
+            max-width: 600px;
+            height: 90vh; /* Usa más altura */
+            max-height: 800px;
+            background: linear-gradient(180deg, rgba(29, 0, 78, 0.8) 0%, rgba(13, 1, 36, 0.8) 100%);
+            border: 4px solid #3b82f6; 
+            box-shadow: 0 0 40px rgba(59, 130, 246, 0.5);
+            overflow: hidden;
+            border-radius: 1rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Protagonista: POSICIONAMIENTO SIMPLIFICADO */
+        #player {
+            position: absolute;
+            bottom: 5%; 
+            width: 80px; 
+            height: 80px;
+            z-index: 10;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* ELEMENTO VISUAL DEL PROTAGONISTA (IMAGEN EXTERNA) */
+        #player-head {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #player-head img {
+            width: 70px; 
+            height: 70px;
+            object-fit: contain;
+            filter: drop-shadow(0 0 4px #facc15);
+        }
+
+        /* Estilos de las entidades (cayendo de arriba) */
+        .entity {
+            position: absolute;
+            font-size: 2.5rem;
+            top: 0; 
+            left: 0; 
+            transform: translate(-50%, 0) translateZ(0); 
+            pointer-events: none; 
+        }
+        
+        /* Estilos del mensaje emergente */
+        #message-overlay {
+            position: absolute;
+            top: 10%; 
+            left: 50%;
+            transform: translate(-50%, 0); 
+            z-index: 20;
+            pointer-events: none;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+        }
+
+        .message-text {
+            padding: 0.5rem 1.5rem; /* Reducción de padding */
+            border-radius: 1rem;
+            text-shadow: 2px 2px 4px #000000;
+            font-weight: bold;
+        }
+
+        .mamadera-text {
+            background-color: rgba(59, 130, 246, 0.9); 
+            color: #ffffff;
+            font-size: 1.5rem; /* Reducción de tamaño */
+            
+        }
+
+        .don-hugo-text {
+            background-color: rgba(234, 179, 8, 0.9); 
+            color: #1f2937;
+            font-size: 2rem; /* Reducción de tamaño */
+            animation: pulse 1s infinite alternate;
+        }
+        
+        /* Efecto de pantalla durante Don Hugo Mode */
+        .don-hugo-active {
+            filter: brightness(1.2) hue-rotate(-20deg);
+        }
+
+        @keyframes pulse {
+            from { transform: scale(1); box-shadow: 0 0 30px #facc15; }
+            to { transform: scale(1.05); box-shadow: 0 0 50px #facc15; }
+        }
+
+        /* Fondo de estrellas */
+        .stars {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            z-index: 0;
+        }
+
+        .stars::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 1px, transparent 1px);
+            background-size: 150px 150px;
+            opacity: 0.1;
+            animation: star-scroll 100s linear infinite;
+        }
+
+        @keyframes star-scroll {
+            from { background-position: 0 0; }
+            to { background-position: -15000px 0; }
+        }
+
+        /* Overlay de Inicio / Fin del Juego - ESTILO RETRO/CUTRE */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 15;
+            border-radius: 1rem;
+            text-align: center;
+            padding: 1rem;
+            
+            /* Efecto Glitch/Falla */
+            border: 4px solid #ff00ff; 
+            box-shadow: 0 0 10px #00ffff, 0 0 20px #ff00ff; 
+        }
+        
+        .overlay h1, .overlay p, .final-score-text, .high-score-title {
+            /* Sombra tipo 8-bit */
+            text-shadow: 4px 4px #000000, 6px 6px #ff00ff; 
+            letter-spacing: 2px;
+        }
+
+        /* Estilos de la lista de High Scores */
+        #high-scores-list {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #00ffff;
+            border-radius: 0.5rem;
+            max-width: 90%;
+            width: 300px;
+        }
+        .score-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+            padding: 5px 0;
+        }
+        .score-item .name {
+            color: #ff00ff;
+            max-width: 140px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding-right: 5px;
+            text-align: left;
+            flex-grow: 1;
+        }
+        .score-item .value {
+            color: #facc15;
+            min-width: 50px;
+            text-align: right;
+        }
+
+        /* Estilos para el Top 3 específico */
+        .score-item:nth-child(1) { background-color: rgba(255, 215, 0, 0.1); border-left: 5px solid gold; }
+        .score-item:nth-child(2) { background-color: rgba(192, 192, 192, 0.1); border-left: 5px solid silver; }
+        .score-item:nth-child(3) { background-color: rgba(205, 127, 50, 0.1); border-left: 5px solid #CD7F32; }
+
+
+        .game-button {
+            background-color: #facc15; 
+            color: #1f2937; 
+            font-weight: bold;
+            text-transform: uppercase;
+            box-shadow: 4px 4px #1f2937;
+            border: 2px solid #1f2937;
+            transition: all 0.1s;
+        }
+        .game-button:hover {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px #1f2937;
+        }
+
+        /* Estilos específicos para la vida (Paquetes) */
+        #lives-display {
+            font-size: 1.5rem; /* Aumenta el tamaño de los emojis */
+        }
+        #lives-display.animate-pulse {
+            animation: flash-red 0.5s infinite alternate;
+        }
+        @keyframes flash-red {
+            from { color: #facc15; }
+            to { color: #f87171; text-shadow: 0 0 5px #f87171; }
+        }
+
+        /* Estilos para la pantalla de "Explicación" */
+        #game-over-content .text-red-500 {
+            color: #ff00ff; /* Magenta */
+            text-shadow: 4px 4px #000000, 2px 2px #00ffff; /* Cian */
+        }
+        
+        /* Estilo para los nuevos textos aleatorios */
+        #explanation-text {
+            font-style: italic;
+            color: #fef08a; /* Amarillo suave */
+            margin-top: 0.5rem;
+            margin-bottom: 1.5rem;
+            font-size: 1.1rem;
+            text-shadow: 2px 2px #000000;
+        }
+
+        @media (max-width: 640px) {
+            #game-container {
+                width: 100%;
+                height: 100vh;
+                max-width: none;
+                max-height: none;
+            }
+            .overlay h1 { font-size: 3rem; }
+            .overlay p { font-size: 1rem; }
+            #high-scores-list {
+                width: 90%;
+            }
+            #game-over-content h2 { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- Fondo de estrellas -->
+        <div class="stars"></div>
+
+        <!-- Área de Puntuación (Solo Paquetes, Puntuación y Racha) -->
+        <div class="z-10 p-4 w-full flex justify-between items-center text-lg bg-gray-900 bg-opacity-50">
+            <!-- Solo el display de los paquetes -->
+            <span id="lives-display" class="font-bold text-red-400">📦📦📦</span> 
+            
+            <span>Puntuación: <span id="score-display" class="font-bold text-yellow-400">0</span></span>
+            <span>Racha: <span id="streak-display" class="font-bold text-green-400">0</span></span>
+        </div>
+
+        <!-- Protagonista -->
+        <div id="player">
+            <span id="player-head">
+                <img src="https://i.postimg.cc/J0LybTSX/1760534855484.png" 
+                     alt="Protagonista Cutre"
+                     onerror="this.style.display='none'; this.parentNode.textContent='👾'; this.parentNode.style.fontSize='3.5rem';">
+            </span>
+        </div>
+
+        <!-- Overlay de Mensajes -->
+        <div id="message-overlay">
+            <span id="message-text" class="message-text"></span>
+        </div>
+
+        <!-- Overlay de Inicio / Fin del Juego -->
+        <div id="start-overlay" class="overlay">
+            
+            <!-- Contenedor para manejar las diferentes vistas del menú -->
+            <div id="menu-wrapper" class="flex flex-col items-center w-full h-full justify-center">
+
+                <!-- 1. Contenido de Game Over (Inicialmente oculto) -->
+                <div id="game-over-content" class="hidden flex flex-col items-center">
+                    <!-- TÍTULO CAMBIADO A "PEDIDO DE EXPLICACIÓN" -->
+                    <h2 class="text-4xl mt-4 mb-2 font-bold text-red-500">¡PEDIDO DE EXPLICACIÓN ACTIVO!</h2>
+                    
+                    <!-- NUEVO ELEMENTO PARA EL TEXTO ALEATORIO -->
+                    <p id="explanation-text" class="text-lg mb-4 text-gray-300">...</p>
+                    
+                    <div id="final-score-details" class="final-score-text mt-2 text-3xl font-bold text-yellow-400"></div>
+
+                    <div class="mt-4 w-full max-w-xs px-4">
+                        <label for="signature" class="block text-sm font-medium text-cyan-400 text-left">Firma/Alias (Máx 12 Caract.):</label>
+                        <input type="text" id="signature" maxlength="12" class="mt-1 block w-full px-3 py-2 border border-gray-600 bg-gray-800 text-white rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 text-center" placeholder="Tu Nombre de Guardián">
+                        <p id="signature-error" class="text-red-400 text-xs mt-1 hidden">El alias no puede estar vacío.</p>
+                    </div>
+                    
+                    <div class="flex space-x-4 mt-6">
+                        <button id="cut-order-button" class="game-button px-6 py-3 text-lg rounded-lg bg-gray-500 hover:bg-gray-600">
+                            ✂️ Ignorar Pedido
+                        </button>
+                        <button id="save-score-button" class="game-button px-6 py-3 text-lg rounded-lg">
+                            ✍️ Firmar y Registrar
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 2. Contenido de Inicio (Inicialmente visible) -->
+                <div id="start-content" class="flex flex-col items-center">
+                    <h1 class="text-5xl mb-4 font-bold text-blue-400">GUARDÍAN DEL BIBERÓN</h1>
+                    <p class="text-xl mb-8">¡Muévete lateralmente para atrapar los 🍼 y evita las 💥!</p>
+                    
+                    <div id="loading-firebase" class="text-white text-lg mb-4">Cargando puntuaciones...</div>
+
+                    <button id="start-button" class="game-button px-8 py-3 text-xl rounded-lg mt-4">
+                        ¡NUEVO JUEGO!
+                    </button>
+                    <button id="view-scores-button" class="game-button px-6 py-2 text-md rounded-lg mt-4 bg-purple-600 hover:bg-purple-700">
+                        🏆 Ver Puntuaciones Altas
+                    </button>
+                    <p id="user-id-display" class="mt-4 text-xs text-gray-500">ID Usuario: Cargando...</p>
+                </div>
+
+                <!-- 3. Vista de Puntuaciones Altas (Inicialmente oculto) -->
+                <div id="high-scores-view" class="hidden flex flex-col items-center">
+                    <!-- TÍTULO CAMBIADO A "TOP 3 MAMADERAS" -->
+                    <h2 class="high-score-title text-3xl mt-4 mb-4 text-cyan-400">TOP 3 MAMADERAS</h2>
+                    <div id="high-scores-list">
+                        <!-- Scores se inyectarán aquí -->
+                    </div>
+                    <button id="back-button" class="game-button px-6 py-2 text-lg rounded-lg mt-8 bg-blue-600 hover:bg-blue-700">
+                        Volver al Menú
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Indicador de Control Táctil (Solo para móvil) -->
+    <div class="fixed bottom-0 p-2 text-xs text-gray-400 w-full text-center sm:hidden">
+        Desliza (Swipe) Izquierda/Derecha para moverte.
+    </div>
+
+    <script type="module">
+        // --- Importaciones de Firebase ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, setLogLevel, query, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Variables Globales y Configuración del Juego ---
+        const gameContainer = document.getElementById('game-container');
+        const player = document.getElementById('player');
+        const scoreDisplay = document.getElementById('score-display');
+        const streakDisplay = document.getElementById('streak-display');
+        const livesDisplay = document.getElementById('lives-display'); 
+        const startOverlay = document.getElementById('start-overlay');
+        
+        // Elementos del menú
+        const startContent = document.getElementById('start-content');
+        const startButton = document.getElementById('start-button');
+        const viewScoresButton = document.getElementById('view-scores-button'); 
+        const highScoresView = document.getElementById('high-scores-view'); 
+        const backButton = document.getElementById('back-button'); 
+        const loadingFirebase = document.getElementById('loading-firebase');
+        const highScoresList = document.getElementById('high-scores-list');
+        const userIdDisplay = document.getElementById('user-id-display');
+        
+        // Elementos del Game Over / Pedido de Explicación
+        const gameOverContent = document.getElementById('game-over-content');
+        const finalScoreDetails = document.getElementById('final-score-details');
+        const saveScoreButton = document.getElementById('save-score-button'); 
+        const cutOrderButton = document.getElementById('cut-order-button');
+        const signatureInput = document.getElementById('signature');
+        const signatureError = document.getElementById('signature-error');
+        const explanationText = document.getElementById('explanation-text'); // Nuevo elemento
+
+        // ARRAY DE FRASES ALEATORIAS PARA GAME OVER
+        const GAME_OVER_PHRASES = [
+            "Ya no te quedan ni cardiólogos ni parientes. Se exige tu firma.",
+            "¿Cuántos corazones tenés? (Ahora cero. Se exige tu firma)",
+            "Ya no tengo más pallet y columnas quedan pocas. Se exige tu firma.",
+            "La siguiente la agarrás. (Pero ya no hay siguiente). Se exige tu firma.",
+            "Has agotado tu cuota de errores. Se exige tu firma para el registro.",
+            "Se requiere una explicación escrita sobre este rendimiento. ¡Firme aquí!"
+        ];
+
+
+        // Valores de configuración del juego
+        const GAME_SPEED = 4; 
+        const PLAYER_SIZE = 80; 
+        const SPAWN_INTERVAL = 600; 
+
+        // CONFIGURACIÓN MODO DON HUGO
+        const DON_HUGO_SCORE_MULTIPLIER = 1; // Puntos base
+        const DON_HUGO_MAX_MULTIPLIER = 4; // Límite real del multiplicador de puntuación
+        const DON_HUGO_DURATION = 10000; // 10 segundos
+        const DON_HUGO_STREAK_THRESHOLD = 10; 
+        const DON_HUGO_SPAWN_RATE = 100; 
+
+        // AJUSTE DE MOVIMIENTO Y FLUIDEZ
+        const KEYBOARD_STEP = 35; 
+        const TOUCH_SENSITIVITY = 1.4; 
+        
+        // AJUSTE DE HITBOX
+        const PLAYER_HITBOX_FACTOR = 0.30; 
+        const ENTITY_HITBOX_FACTOR = 1.5; 
+        const ENTITY_VISUAL_SIZE = 40; 
+
+        const INVULNERABILITY_DURATION = 2000; // 2 segundos
+        
+        let gameState = 'ready'; 
+        let score = 0;
+        let streak = 0;
+        let donHugoCombo = 0; // Para la visualización (x2, x3...)
+        let donHugoRealMultiplier = 1; // Para la puntuación real (máx x4)
+        let lives = 3; 
+        let isInvulnerable = false; 
+        let isDonHugoMode = false; 
+        let donHugoTimerId = null; 
+        let lastTime = 0;
+        let lastSpawnTime = 0; 
+        let entities = [];
+        let entityTimer = 0; 
+        let playerX = 0; 
+        let touchStartX = 0;
+        const KEY_LEFT = 37;
+        const KEY_RIGHT = 39;
+        let containerWidth = 0;
+
+        // --- Variables de Firebase (Inicializadas en setupFirebase) ---
+        let db;
+        let auth;
+        let currentUserId = null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        // --- Funciones de Firebase ---
+        
+        /**
+         * Inicializa Firebase, autentica al usuario y establece el listener de High Scores.
+         */
+        async function setupFirebase() {
+            setLogLevel('Debug');
+            try {
+                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                loadingFirebase.textContent = "Autenticando...";
+                
+                const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                if (token) {
+                    await signInWithCustomToken(auth, token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        currentUserId = user.uid;
+                        userIdDisplay.textContent = `ID Usuario: ${currentUserId.substring(0, 8)}...`;
+                        loadHighScores(currentUserId);
+                    } else {
+                        console.error("No se pudo obtener el UID del usuario.");
+                        currentUserId = 'anonymous-' + crypto.randomUUID();
+                        userIdDisplay.textContent = `ID Usuario: ${currentUserId.substring(0, 8)}... (Anónimo)`;
+                        loadingFirebase.textContent = "Error de autenticación. Sin High Scores persistentes.";
+                    }
+                });
+
+            } catch (error) {
+                console.error("Error al configurar Firebase:", error);
+                loadingFirebase.textContent = "Error de configuración de Firebase. No hay High Scores.";
+            }
+        }
+
+        /**
+         * Guarda la puntuación del jugador.
+         * @param {number} finalScore - La puntuación lograda.
+         * @param {string} signature - El nombre/alias introducido por el jugador.
+         */
+        async function saveHighScore(finalScore, signature) {
+            if (finalScore <= 0 || !db || !currentUserId) return;
+
+            const nameToSave = signature.trim().substring(0, 12) || `Guardian-${currentUserId.substring(0, 4)}`;
+
+            try {
+                const scoresCollectionRef = collection(db, `artifacts/${appId}/public/data/high_scores`);
+                
+                await addDoc(scoresCollectionRef, {
+                    score: finalScore,
+                    name: nameToSave, // Nuevo campo para el alias
+                    userId: currentUserId,
+                    timestamp: serverTimestamp() 
+                });
+                console.log("Puntuación guardada con éxito.");
+            } catch (error) {
+                console.error("Error guardando High Score:", error);
+            }
+        }
+
+        /**
+         * Carga las puntuaciones altas en tiempo real.
+         */
+        function loadHighScores(userId) {
+            if (!db) return;
+
+            const scoresCollectionRef = collection(db, `artifacts/${appId}/public/data/high_scores`);
+            // Limitar a un número razonable de scores para el onSnapshot
+            const scoresQuery = query(scoresCollectionRef, limit(10)); 
+
+            const unsubscribe = onSnapshot(scoresQuery, (snapshot) => {
+                loadingFirebase.classList.add('hidden');
+                
+                let scores = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    scores.push({
+                        id: doc.id,
+                        score: data.score,
+                        name: data.name || `Guardian-${data.userId.substring(0, 4)}`, // Usar nombre guardado
+                        userId: data.userId,
+                        timestamp: data.timestamp ? data.timestamp.toDate() : new Date()
+                    });
+                });
+                
+                // 1. Ordenar por score de forma descendente (client-side sorting)
+                scores.sort((a, b) => b.score - a.score);
+
+                // 2. Renderizar solo el Top 3
+                renderHighScores(scores.slice(0, 3));
+            }, (error) => {
+                console.error("Error al obtener High Scores:", error);
+                loadingFirebase.textContent = "Error al cargar puntuaciones.";
+            });
+        }
+
+        /**
+         * Renderiza la lista de puntuaciones.
+         * @param {Array} scores - Lista de puntuaciones (ya filtrada a Top 3).
+         */
+        function renderHighScores(scores) {
+            highScoresList.innerHTML = '';
+            
+            if (scores.length === 0) {
+                highScoresList.innerHTML = '<p class="text-gray-400 text-center">Sé el primero en el TOP 3!</p>';
+                return;
+            }
+
+            scores.forEach((item, index) => {
+                const scoreItem = document.createElement('div');
+                scoreItem.classList.add('score-item', 'shadow-lg');
+
+                // Determinar el prefijo para los 3 mejores
+                let prefix = `${index + 1}.`;
+                if (index === 0) prefix = '🥇';
+                else if (index === 1) prefix = '🥈';
+                else if (index === 2) prefix = '🥉';
+
+                scoreItem.innerHTML = `
+                    <span class="text-cyan-300 mr-2">${prefix}</span>
+                    <span class="name">${item.name}</span>
+                    <span class="value">${item.score}</span>
+                `;
+                highScoresList.appendChild(scoreItem);
+            });
+        }
+
+
+        // --- Funciones de Utilidad del Juego y UI ---
+        
+        /**
+         * Muestra la pantalla de inicio y oculta las demás.
+         */
+        function showStartMenu() {
+            startContent.classList.remove('hidden');
+            gameOverContent.classList.add('hidden');
+            highScoresView.classList.add('hidden');
+            startOverlay.style.display = 'flex';
+            signatureInput.value = ''; 
+            signatureError.classList.add('hidden');
+        }
+
+        /**
+         * Muestra la pantalla de Puntuaciones Altas y oculta las demás.
+         */
+        function showScoresView() {
+            startContent.classList.add('hidden');
+            gameOverContent.classList.add('hidden');
+            highScoresView.classList.remove('hidden');
+            startOverlay.style.display = 'flex';
+        }
+
+        /**
+         * Actualiza la representación visual de las vidas (paquetes).
+         */
+        function updateLivesDisplay() {
+            livesDisplay.textContent = '📦'.repeat(lives);
+            if (lives === 1) {
+                livesDisplay.classList.add('animate-pulse');
+            } else {
+                livesDisplay.classList.remove('animate-pulse');
+            }
+        }
+
+        /**
+         * Inicializa el juego.
+         */
+        function initializeGame() {
+            if (donHugoTimerId) clearTimeout(donHugoTimerId); 
+            isDonHugoMode = false;
+            donHugoCombo = 0; // Resetear combo visual
+            donHugoRealMultiplier = 1; // Resetear combo real
+            gameContainer.classList.remove('don-hugo-active');
+
+            entities.forEach(entity => entity.element.remove());
+            entities = [];
+
+            score = 0;
+            streak = 0;
+            lives = 3; 
+            isInvulnerable = false;
+
+            scoreDisplay.textContent = score;
+            streakDisplay.textContent = streak;
+            updateLivesDisplay(); 
+            messageOverlay.style.opacity = '0';
+            
+            setupGameDimensions();
+
+            playerX = containerWidth / 2;
+            player.classList.remove('opacity-50', 'transition-opacity'); 
+            player.style.left = `${playerX - PLAYER_SIZE / 2}px`;
+            
+            gameState = 'playing';
+            startOverlay.style.display = 'none';
+            lastTime = performance.now();
+            lastSpawnTime = lastTime; 
+            entityTimer = 0;
+            requestAnimationFrame(gameLoop);
+        }
+
+        /**
+         * Inicia el modo Don Hugo.
+         */
+        function startDonHugoMode() {
+            if (isDonHugoMode) return; 
+
+            isDonHugoMode = true;
+            streak = 0; 
+            donHugoCombo = 1; // Primer combo es x1
+            donHugoRealMultiplier = 1;
+            streakDisplay.textContent = streak;
+            gameContainer.classList.add('don-hugo-active');
+            showMessage("¡Don Hugo Activado!", "don-hugo-text");
+            
+            lastSpawnTime = performance.now(); 
+
+            donHugoTimerId = setTimeout(endDonHugoMode, DON_HUGO_DURATION);
+        }
+
+        /**
+         * Termina el modo Don Hugo y vuelve a la normalidad.
+         */
+        function endDonHugoMode() {
+            isDonHugoMode = false;
+            donHugoCombo = 0;
+            donHugoRealMultiplier = 1;
+            gameContainer.classList.remove('don-hugo-active');
+            if (donHugoTimerId) clearTimeout(donHugoTimerId);
+            donHugoTimerId = null;
+            entityTimer = 0; 
+            showMessage("Fin del Don Hugo", "mamadera-text");
+        }
+
+        /**
+         * Maneja la visualización de mensajes emergentes.
+         */
+        const messageOverlay = document.getElementById('message-overlay');
+        const messageText = document.getElementById('message-text');
+
+        function showMessage(text, className) {
+            messageText.textContent = text;
+            messageText.className = `message-text ${className}`;
+            
+            messageOverlay.style.opacity = '1';
+            messageOverlay.style.transform = 'translate(-50%, 0) scale(1.1)'; 
+
+            setTimeout(() => {
+                messageOverlay.style.opacity = '0';
+                messageOverlay.style.transform = 'translate(-50%, 0) scale(1)';
+            }, 800);
+        }
+
+        /**
+         * Crea una nueva entidad (biberón o obstáculo) cayendo.
+         */
+        function spawnEntity() {
+            let isBottle = true; 
+
+            if (!isDonHugoMode) {
+                isBottle = Math.random() > 0.3; 
+            } 
+
+            const entityType = isBottle ? 'bottle' : 'obstacle';
+            const emoji = isBottle ? '🍼' : '💥';
+
+            const entityElement = document.createElement('div');
+            entityElement.classList.add('entity');
+            entityElement.textContent = emoji;
+            gameContainer.appendChild(entityElement);
+
+            const entityX = Math.random() * (containerWidth - ENTITY_VISUAL_SIZE) + ENTITY_VISUAL_SIZE / 2;
+            const entityY = 0; 
+            
+            entityElement.style.transform = `translateX(${entityX - ENTITY_VISUAL_SIZE/2}px) translateY(${entityY}px) translateZ(0)`;
+
+            entities.push({
+                element: entityElement,
+                type: entityType,
+                x: entityX, 
+                y: entityY, 
+                width: ENTITY_VISUAL_SIZE, 
+                height: ENTITY_VISUAL_SIZE,
+                removed: false
+            });
+        }
+        
+        /**
+         * Verifica colisión entre dos rectángulos (AABB).
+         */
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect2.height > rect2.y;
+        }
+
+        /**
+         * Termina el juego. Muestra el "Pedido de Explicación" para guardar score.
+         */
+        function endGame() {
+            gameState = 'over';
+            
+            if (donHugoTimerId) clearTimeout(donHugoTimerId); 
+            isDonHugoMode = false;
+            donHugoCombo = 0;
+            donHugoRealMultiplier = 1;
+            gameContainer.classList.remove('don-hugo-active');
+
+            startContent.classList.add('hidden');
+            highScoresView.classList.add('hidden');
+            gameOverContent.classList.remove('hidden');
+            
+            // Lógica para seleccionar y mostrar frase aleatoria
+            const randomIndex = Math.floor(Math.random() * GAME_OVER_PHRASES.length);
+            explanationText.textContent = GAME_OVER_PHRASES[randomIndex];
+
+            finalScoreDetails.textContent = `Puntuación Final: ${score}`;
+            startOverlay.style.display = 'flex';
+        }
+
+        // --- Bucle Principal del Juego (Game Loop) ---
+
+        function gameLoop(currentTime) {
+            if (gameState !== 'playing') return;
+
+            const deltaTime = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+            
+            // Lógica de aparición
+            if (!isDonHugoMode) {
+                entityTimer += deltaTime * 1000;
+                const spawnRate = SPAWN_INTERVAL * (1 / (1 + score / 50)); 
+                if (entityTimer > spawnRate) { 
+                    spawnEntity();
+                    entityTimer = 0;
+                }
+            } else {
+                 if (currentTime - lastSpawnTime > DON_HUGO_SPAWN_RATE) {
+                     spawnEntity();
+                     lastSpawnTime = currentTime;
+                 }
+            }
+
+            // Lógica de activación de Don Hugo
+            if (!isDonHugoMode && streak >= DON_HUGO_STREAK_THRESHOLD) {
+                startDonHugoMode();
+            }
+
+            // Hitbox del jugador
+            const playerHitboxSize = PLAYER_SIZE * PLAYER_HITBOX_FACTOR;
+            const playerBottom = gameContainer.offsetHeight * 0.05;
+            const playerTop = gameContainer.offsetHeight - playerBottom - PLAYER_SIZE;
+
+            const playerRect = {
+                x: playerX - playerHitboxSize / 2, 
+                y: playerTop + (PLAYER_SIZE - playerHitboxSize) / 2, 
+                width: playerHitboxSize,
+                height: playerHitboxSize
+            };
+            
+            // Recorrer entidades, mover y chequear colisiones
+            // FÓRMULA DE VELOCIDAD SUAVIZADA (Usa logaritmo para un crecimiento más controlado)
+            const calculatedSpeed = GAME_SPEED + Math.log(score + 1) * 0.5;
+            const fallSpeed = calculatedSpeed * 100 * deltaTime; 
+            const gameHeight = gameContainer.offsetHeight;
+
+            for (let i = entities.length - 1; i >= 0; i--) {
+                const entity = entities[i];
+                if (entity.removed) continue;
+
+                entity.y += fallSpeed; 
+                
+                entity.element.style.transform = `translateX(${entity.x - ENTITY_VISUAL_SIZE/2}px) translateY(${entity.y}px) translateZ(0)`;
+                
+                const entityHitboxSize = ENTITY_VISUAL_SIZE * ENTITY_HITBOX_FACTOR;
+                const entityRect = {
+                    x: entity.x - entityHitboxSize / 2,
+                    y: entity.y - entityHitboxSize / 2, 
+                    width: entityHitboxSize,
+                    height: entityHitboxSize
+                };
+
+                // Colisión
+                if (checkCollision(playerRect, entityRect)) {
+                    entity.removed = true;
+                    entity.element.remove();
+
+                    if (entity.type === 'bottle') {
+                        
+                        if (isDonHugoMode) {
+                            // Aumentar el combo visualmente y limitar el real
+                            donHugoCombo++;
+                            // Limitar el multiplicador real a DON_HUGO_MAX_MULTIPLIER
+                            donHugoRealMultiplier = Math.min(donHugoCombo, DON_HUGO_MAX_MULTIPLIER);
+                            
+                            let points = DON_HUGO_SCORE_MULTIPLIER * donHugoRealMultiplier;
+                            score += points;
+                            scoreDisplay.textContent = score;
+
+                            // Mostrar el combo visual
+                            showMessage(`¡Mamadera!! Combo x${donHugoCombo}`, "don-hugo-text");
+                            
+                        } else {
+                            // Modo normal
+                            score += DON_HUGO_SCORE_MULTIPLIER;
+                            scoreDisplay.textContent = score;
+                            streak++;
+                            streakDisplay.textContent = streak;
+                            showMessage("¡Mamadera!!", "mamadera-text");
+                        }
+
+
+                    } else if (entity.type === 'obstacle') {
+                        // REINICIAR COMBO SI SE CHOCA UN OBSTÁCULO (AUNQUE NO PIERDA VIDA EN DH MODE)
+                        if (isDonHugoMode) {
+                             donHugoCombo = 0;
+                             donHugoRealMultiplier = 1;
+                        }
+                        
+                        if (isDonHugoMode) {
+                            // En modo Don Hugo, el combo se reinicia por colisión, pero no pierde vida
+                            showMessage("¡Esquivado por Don Hugo! 😎", "don-hugo-text");
+                        }
+                        
+                        if (!isInvulnerable && !isDonHugoMode) {
+                            lives--;
+                            updateLivesDisplay();
+                            // MENSAJE DE IMPACTO CAMBIADO A "¡EPA!"
+                            showMessage("¡EPA! 💥", "mamadera-text"); 
+                            
+                            streak = 0;
+                            streakDisplay.textContent = streak;
+
+                            if (lives <= 0) {
+                                endGame();
+                                return; 
+                            } else {
+                                isInvulnerable = true;
+                                player.classList.add('opacity-50', 'transition-opacity');
+                                // Ahora sí se usa la constante definida
+                                setTimeout(() => {
+                                    isInvulnerable = false;
+                                    player.classList.remove('opacity-50', 'transition-opacity');
+                                }, INVULNERABILITY_DURATION); 
+                            }
+                        }
+                        
+                    }
+                }
+
+                // Limpieza de entidades que caen fuera de pantalla
+                if (entity.y > gameHeight) {
+                    // Si la mamadera cae, reinicia el combo (en ambos modos)
+                    if (entity.type === 'bottle' && !entity.removed) {
+                        streak = 0;
+                        streakDisplay.textContent = streak;
+                        
+                        // REINICIAR COMBO SI SE ERRA UNA MAMADERA EN DH MODE
+                        if (isDonHugoMode) {
+                            donHugoCombo = 0;
+                            donHugoRealMultiplier = 1;
+                        }
+                    }
+                    entity.element.remove();
+                    entities.splice(i, 1); 
+                }
+            }
+            
+            // ** LO CRÍTICO: LLAMAR A LA SIGUIENTE ANIMACIÓN **
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- Controles del Jugador ---
+        
+        function movePlayer(deltaX) {
+            playerX += deltaX;
+
+            const minLeft = PLAYER_SIZE / 2;
+            const maxLeft = containerWidth - PLAYER_SIZE / 2;
+
+            if (playerX < minLeft) playerX = minLeft;
+            if (playerX > maxLeft) playerX = maxLeft;
+
+            player.style.left = `${playerX - PLAYER_SIZE / 2}px`;
+        }
+
+        // Eventos de teclado (Escritorio)
+        document.addEventListener('keydown', (e) => {
+            if (gameState === 'playing') {
+                if (e.keyCode === KEY_LEFT) {
+                    movePlayer(-KEYBOARD_STEP);
+                } else if (e.keyCode === KEY_RIGHT) {
+                    movePlayer(KEYBOARD_STEP);
+                }
+            }
+        });
+
+        // Eventos táctiles (Móvil)
+        gameContainer.addEventListener('touchstart', (e) => {
+            if (gameState === 'playing') {
+                touchStartX = e.touches[0].clientX;
+            }
+        });
+
+        gameContainer.addEventListener('touchmove', (e) => {
+            if (gameState === 'playing') {
+                e.preventDefault(); 
+                const currentX = e.touches[0].clientX;
+                const deltaX = currentX - touchStartX;
+                
+                movePlayer(deltaX * TOUCH_SENSITIVITY); 
+                
+                touchStartX = currentX; 
+            }
+        });
+        
+        // --- Inicio del Juego y Manejo de Resize ---
+
+        function setupGameDimensions() {
+             const gameBounds = gameContainer.getBoundingClientRect();
+             containerWidth = gameBounds.width;
+             
+             if (gameState === 'ready' || gameState === 'over') {
+                 playerX = containerWidth / 2;
+                 player.style.left = `${playerX - PLAYER_SIZE / 2}px`;
+             }
+        }
+
+        // Event listeners para los botones de la UI
+        
+        // Botón "Firma del Implicado"
+        saveScoreButton.addEventListener('click', () => {
+            const signature = signatureInput.value.trim();
+            if (signature === '') {
+                signatureError.classList.remove('hidden');
+                return;
+            }
+            signatureError.classList.add('hidden');
+            saveHighScore(score, signature);
+            showStartMenu(); 
+        });
+
+        // Botón "Cortar el Pedido" (Ir al menú sin guardar)
+        cutOrderButton.addEventListener('click', showStartMenu);
+
+        // Botón "Ver Puntuaciones Altas"
+        viewScoresButton.addEventListener('click', showScoresView);
+
+        // Botón "Volver al Menú"
+        backButton.addEventListener('click', showStartMenu);
+
+
+        window.onload = function() {
+             setupGameDimensions();
+             window.addEventListener('resize', setupGameDimensions);
+             
+             setupFirebase();
+             
+             startButton.addEventListener('click', initializeGame);
+        }
+
+    </script>
+</body>
+</html>
